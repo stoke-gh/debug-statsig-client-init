@@ -1,0 +1,36 @@
+[project]
+name = "repro"
+version = "0.0.0"
+description = ""
+requires-python = ">= 3.13"
+dependencies = [
+  "fastapi==0.115.14",
+  "gunicorn==23.0.0",
+  "requests==2.32.4",
+  "uvicorn==0.35.0",
+  "statsig==0.58.3",
+  "statsig-python-core==0.5.2",
+]
+
+[project.scripts]
+repro = "repro.main:main"
+
+# =============================================================================
+# UV Settings
+# =============================================================================
+
+[tool.uv]
+dev-dependencies = []
+
+[tool.uv.sources]
+
+# =============================================================================
+# Build System
+# =============================================================================
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true

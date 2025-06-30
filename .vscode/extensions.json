@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "charliermarsh.ruff",
+    "editorconfig.editorconfig",
+    "esbenp.prettier-vscode",
+    "nefrob.vscode-just-syntax"
+  ]
+}

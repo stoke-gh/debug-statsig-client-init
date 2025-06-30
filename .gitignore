@@ -1,0 +1,45 @@
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# testing
+coverage
+
+# next.js
+.next/
+out/
+build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env files
+.env*
+!.env.example
+# For nextjs, already covered though.
+.env*.local
+
+# turbo
+.turbo
+
+# vercel
+.vercel
+
+# use pnpm, not npm
+.package-lock.json
+
+# typescriot
+*.tsbuildinfo
+
+# python
+__pycache__
+
+# rust
+target/

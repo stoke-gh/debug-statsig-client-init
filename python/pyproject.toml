@@ -1,0 +1,43 @@
+[project]
+name = "code"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = ["repro"]
+
+[tool.uv]
+resolution = "lowest-direct"
+dev-dependencies = []
+
+[tool.uv.sources]
+repro = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.pyright]
+include = ["packages/**"]
+exclude = ["**/node_modules", "**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+
+reportMissingImports = "error"
+reportMissingTypeStubs = false
+
+pythonVersion = "3.13"
+pythonPlatform = "Linux"
+
+executionEnvironments = [{ root = "src" }]
+
+[tool.basedPyright]
+include = ["packages/**"]
+exclude = ["**/node_modules", "**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+
+reportMissingImports = "error"
+reportMissingTypeStubs = false
+
+pythonVersion = "3.13"
+pythonPlatform = "Linux"
+
+executionEnvironments = [{ root = "src" }]
