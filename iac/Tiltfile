@@ -1,0 +1,47 @@
+
+load("./steps/after-network.tilt", "step_after_network")
+load("./steps/cluster.tilt", "step_cluster")
+load("./steps/helm-repos.tilt", "step_helm_repos")
+load("./steps/network.tilt", "step_network")
+load("./steps/services.tilt", "step_services")
+
+# =============================================================================
+# Config & Helpers
+# =============================================================================
+
+def initial_context():
+    return {
+        "cluster_name": "statsig-debug",
+    }
+
+
+def destroy_everything(ctx):
+    cluster_name = ctx["cluster_name"]
+    local("ctlptl delete cluster kind-{}".format(cluster_name))
+    return ctx
+
+# =============================================================================
+# Deploy Steps
+# =============================================================================
+
+def deploy():
+    ctx = initial_context()
+
+    if config.tilt_subcommand == 'down':
+        destroy_everything(ctx)
+        return
+
+    # TODO: If the cluster is being created, may want to trigger a warning or
+    # manual intervention the communicates two runs are necessary.
+
+    ctx = step_cluster(ctx)
+    ctx = step_helm_repos(ctx)
+    ctx = step_network(ctx)
+    ctx = step_after_network(ctx)
+    ctx = step_services(ctx)
+
+# =============================================================================
+# Entrypoint
+# =============================================================================
+
+deploy()

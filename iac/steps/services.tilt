@@ -1,0 +1,305 @@
+load("../utils.tilt", "repo_path")
+
+# =============================================================================
+# Validation and parsing
+# =============================================================================
+
+_valid_types = [
+    "internal-http",
+    "internal-grpc",
+    "external-http",
+    "external-grpc",
+    "custom",
+]
+
+def validate_type(values):
+    service_type = values["type"]
+    if type(service_type) != "string":
+        fail("Config option '<service>.type' must be a string.")
+    if service_type not in _valid_types:
+        fail("Invalid service type '{}' (the valid types are: {}).".format(service_type, _valid_types))
+    return service_type
+
+
+def validate_binary(values):
+    binary_name = values["binary"]
+    if type(binary_name) != "string":
+        fail("Config option '<service>.binary' must be a string.")
+
+    binary_dir = repo_path("cluster/binary/{}".format(binary_name))
+    binary_config = os.path.join(binary_dir, "config.yaml")
+
+    # Check that the config file exists:
+    if not os.path.exists(binary_config):
+        fail("Config option '<service>.binary' does not reference a valid config file at '{}'.".format(binary_config))
+
+    return {
+        "name": binary_name,
+        "dir": binary_dir,
+        "config": binary_config,
+    }
+
+
+def validate_live_check(values):
+    live_check = values.get("live-check")
+    if not live_check:
+        return None
+    if type(live_check) != "dict":
+        fail("Config option '<service>.live-check' must be a dict.")
+    return live_check
+
+
+def validate_ready_check(values):
+    ready_check = values.get("ready-check")
+    if not ready_check:
+        return None
+    if type(ready_check) != "dict":
+        fail("Config option '<service>.ready-check' must be a dict.")
+    return ready_check
+
+def is_local_enabled(values):
+    local_enabled = values.get("local", {}).get("enabled")
+    if not local_enabled:
+        return False
+    if type(local_enabled) != "bool":
+        fail("Config option '<service>.local.enabled' must be a bool.")
+    return local_enabled
+
+def get_service_configs(ctx):
+    config_path = repo_path("cluster/services.yaml")
+    if not os.path.exists(config_path):
+        fail("Services config file '{}' does not exist.".format(config_path))
+    config = read_yaml(config_path)
+    return config
+
+def get_binary_key(binary_info):
+    return "binary.{}".format(binary_info["name"])
+
+def get_namespace(service_type):
+    if service_type == "internal-http" or service_type == "internal-grpc":
+        return "internal"
+    if service_type == "external-http" or service_type == "external-grpc":
+        return "external"
+    fail("Namespace not configured for service type '{}'.".format(service_type))
+
+# =============================================================================
+# Deployment
+# =============================================================================
+
+local_tag = "latest"
+
+def deploy_binary(ctx, binary_info):
+    cluster_name = ctx["cluster_name"]
+    binary_key = get_binary_key(binary_info)
+
+    dockerfile_path = os.path.join(binary_info["dir"], "Dockerfile")
+    if not os.path.exists(dockerfile_path):
+        fail("Config option '<service>.binary' does not reference a binary with a valid dockerfile at '{}'.".format(dockerfile_path))
+
+    config = read_yaml(binary_info["config"])
+    context_value = config.get("build", {}).get("context")
+    context_path = repo_path(context_value)
+
+    if not os.path.exists(context_path):
+        fail("Config option '<service>.binary' does not reference a valid context at '{}'.".format(context_path))
+
+    docker_build(
+        ref="{}/{}:{}".format(cluster_name, binary_info["name"], local_tag),
+        context=context_path,
+        dockerfile=dockerfile_path,
+    )
+
+    return ctx | { binary_key: True }
+
+
+def deploy_service(ctx, name, values):
+    service_type = validate_type(values)
+    binary_info = validate_binary(values)
+    live_check = validate_live_check(values)
+    ready_check = validate_ready_check(values)
+
+    binary_key = get_binary_key(binary_info)
+    if not ctx.get(binary_key):
+        ctx = deploy_binary(ctx, binary_info)
+
+    namespace = get_namespace(service_type)
+    replicas = values.get("replicas", 1)
+
+    cluster_name = ctx["cluster_name"]
+    image_name = "{}/{}:{}".format(cluster_name, binary_info["name"], local_tag)
+
+    port = values.get("port")
+    if not port:
+        fail("Config option '<service>.port' is required.")
+    if type(port) != "int":
+        fail("Config option '<service>.port' must be an int.")
+
+    # TODO: Get this based on service type (?)
+    port_name = "http"
+    protocol = "TCP"
+
+    # TODO: Setup env better.
+    env_list = []
+
+    local_env = values.get("local", {}).get("env", [])
+    for env_var in local_env:
+        env_key = env_var["key"]
+        env_list.append({"name": env_key, "value": os.getenv(env_key)})
+
+    local_set_env = values.get("local", {}).get("set-env", [])
+    for env_var in local_set_env:
+        env_key = env_var["key"]
+        env_value = env_var["value"]
+        env_list.append({"name": env_key, "value": env_value})
+
+    env_list.extend([
+      {"name": "ENV", "value": "dev"},
+      {"name": "CLUSTER", "value": "local"},
+      {"name": "APP", "value": name},
+      {"name": "PORT", "value": str(port)},
+      {"name": "VERSION", "value": "latest-local"},
+      {"name": "NAMESPACE", "value": namespace},
+    ])
+
+    main_container_yaml = {
+        "name": name,
+        "image": image_name,
+        "ports": [
+            {
+                "containerPort": port,
+                "protocol": protocol
+            }
+        ],
+        "env": env_list,
+        "resources": {
+            "requests": {
+                "memory": "128Mi",
+                "cpu": "100m"
+            },
+            "limits": {
+                "memory": "512Mi",
+                "cpu": "500m"
+            }
+        },
+    }
+
+    if live_check:
+        main_container_yaml["livenessProbe"] = {
+            "httpGet": {
+                "path": live_check["path"],
+                "port": port
+            },
+            "initialDelaySeconds": 30,
+            "periodSeconds": 10
+        }
+
+    if ready_check:
+        main_container_yaml["readinessProbe"] = {
+            "httpGet": {
+                "path": ready_check["path"],
+                "port": port
+            },
+            "initialDelaySeconds": 5,
+            "periodSeconds": 5
+        }
+
+    # Deployment YAML
+    deployment_yaml = {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app": name
+            }
+        },
+        "spec": {
+            "replicas": replicas,
+            "selector": {
+                "matchLabels": {
+                    "app": name
+                }
+            },
+            "template": {
+                "metadata": {
+                    "labels": {
+                        "app": name
+                    }
+                },
+                "spec": {
+                    "containers": [
+                        main_container_yaml
+                    ]
+                }
+            }
+        }
+    }
+
+    # Service YAML
+    service_yaml = {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app": name
+            }
+        },
+        "spec": {
+            "selector": {
+                "app": name
+            },
+            "ports": [
+                {
+                    "name": port_name,
+                    "port": port,
+                    "targetPort": port,
+                    "protocol": protocol
+                }
+            ],
+            "type": "ClusterIP"
+        }
+    }
+
+    k8s_yaml([encode_yaml(deployment_yaml), encode_yaml(service_yaml)])
+
+    port_forwards = []
+    local_port = values.get("local", {}).get("forward")
+    if local_port:
+        if type(local_port) != "int":
+            fail("Config option '<service>.local.forward' must be an int.")
+        port_forwards.append("{}:{}".format(local_port, port))
+
+    k8s_resource(
+      name,
+      port_forwards=port_forwards,
+      resource_deps=["services-ready"],
+      labels=["01-{}".format(namespace)],
+    )
+
+    return ctx
+
+
+def deploy_service_check(ctx):
+    local_resource(
+        "services-ready",
+        cmd="echo 'Services ready'",
+        resource_deps=["cluster-healthy", "namespaces"],
+        labels=["10-checks"],
+    )
+    return ctx
+
+# =============================================================================
+# Steps
+# =============================================================================
+
+def step_services(ctx):
+    ctx = deploy_service_check(ctx)
+    config = get_service_configs(ctx)
+    for service_name, service_config in config.items():
+        if not is_local_enabled(service_config):
+            continue
+        ctx = deploy_service(ctx, service_name, service_config)
+    return ctx

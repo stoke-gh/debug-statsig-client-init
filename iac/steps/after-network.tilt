@@ -1,0 +1,32 @@
+
+load("../utils.tilt", "repo_path")
+
+
+def create_namespaces(ctx):
+    path = repo_path("iac/config/local/cluster-yaml/namespaces.yaml")
+    k8s_yaml(path)
+    k8s_resource(
+        objects=["internal", "external"],
+        new_name="namespaces",
+        resource_deps=["network-ready"],
+        labels=["20-cluster"],
+    )
+    return ctx
+
+
+def allow_egress(ctx):
+    path = repo_path("iac/config/local/cluster-yaml/allow-egress.yaml")
+    k8s_yaml(path)
+    k8s_resource(
+        objects=["allow-egress"],
+        new_name="allow-egress",
+        resource_deps=["network-ready"],
+        labels=["21-network"],
+    )
+    return ctx
+
+
+def step_after_network(ctx):
+    ctx = create_namespaces(ctx)
+    ctx = allow_egress(ctx)
+    return ctx

@@ -91,3 +91,14 @@ async def test():
             "data": {"hello": "world"},
         },
     )
+
+
+@router.get("/health")
+async def health():
+    return JSONResponse(
+        status_code=200,
+        content={
+            "success": True,
+            "data": {"health": "ok"},
+        },
+    )

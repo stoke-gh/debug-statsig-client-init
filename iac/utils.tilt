@@ -1,0 +1,11 @@
+def repo_path(path):
+    """
+    Get paths relative to the repo root.
+    """
+    # Should be: <repo>/iac/
+    file_dir = os.path.dirname(__file__)
+    # Should be: <repo>/
+    target_path = os.path.join(file_dir, "..", path)
+    # Should be: /path/to/<repo>/<target_path>
+    abs_path = os.path.abspath(target_path)
+    return abs_path

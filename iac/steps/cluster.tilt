@@ -1,0 +1,58 @@
+
+load("../utils.tilt", "repo_path")
+
+
+def ctlptl_apply(ctx):
+    """
+    Apply the cluster config using ctlptl. This may create a new cluster if it
+    doesn't already exist.
+    """
+    path = repo_path("iac/config/local/cluster-config.yaml")
+    cmd = "ctlptl apply kind -f {}".format(path)
+    local_resource(
+        "cluster-apply",
+        cmd=cmd,
+        deps=[path],
+        labels=["20-cluster"],
+    )
+    return ctx
+
+
+def export_kubeconfig(ctx):
+    cluster_name = ctx["cluster_name"]
+    cmd = "kind export kubeconfig --name {}".format(cluster_name)
+    local_resource(
+        "kubeconfig",
+        cmd=cmd,
+        resource_deps=["cluster-apply"],
+        labels=["20-cluster"],
+    )
+    return ctx
+
+
+def wait_for_cluster(ctx):
+    local_resource(
+        "cluster-ready",
+        cmd='kubectl cluster-info',
+        resource_deps=["kubeconfig"],
+        labels=["10-checks"],
+        allow_parallel=True,
+    )
+    local_resource(
+        "cluster-healthy",
+        cmd="kubectl wait --for=condition=Ready nodes --all --timeout=300s",
+        resource_deps=["kubeconfig"],
+        labels=["10-checks"],
+        allow_parallel=True,
+    )
+    return ctx
+
+
+def step_cluster(ctx):
+    """
+    Setup the cluster itself.
+    """
+    ctx = ctlptl_apply(ctx)
+    ctx = export_kubeconfig(ctx)
+    ctx = wait_for_cluster(ctx)
+    return ctx

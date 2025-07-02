@@ -22,6 +22,13 @@ run-direct:
 run-docker:
   docker-compose up --build
 
+# Run via tilt.
+[working-directory: 'iac']
+tilt *args:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  tilt "$@"
+
 # Send a curl to test the endpoint.
 test:
   curl "http://localhost:8000/v1/test"

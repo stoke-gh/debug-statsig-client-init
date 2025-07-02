@@ -1,0 +1,54 @@
+
+load('ext://helm_resource', 'helm_resource')
+
+load("../utils.tilt", "repo_path")
+
+def install_coredns(ctx):
+    path = repo_path("iac/config/local/cluster-yaml/coredns.yaml")
+    k8s_yaml(path)
+    k8s_resource(
+        new_name="coredns-install",
+        workload="coredns",
+        objects=[
+            "coredns:ServiceAccount",
+            "coredns:ConfigMap",
+            "system\\:coredns:ClusterRole",
+            "system\\:coredns:ClusterRoleBinding",
+        ],
+        resource_deps=["cluster-ready"],
+        labels=["21-network"],
+    )
+    return ctx
+
+
+def install_cilium(ctx):
+    path = repo_path("iac/config/local/cluster-helm/cilium-values.yaml")
+    helm_resource(
+        "cilium-install",
+        chart="cilium/cilium",
+        release_name="cilium",
+        namespace="kube-system",
+        flags=['--values={}'.format(path)],
+        resource_deps=["cluster-ready"],
+        labels=["21-network"],
+    )
+    return ctx
+
+
+def network_check(ctx):
+    # Consider if we should check coredns explicitly.
+    # "kubectl wait --for=condition=ready pod -l k8s-app=kube-dns -n kube-system --timeout=300s"
+    local_resource(
+        "network-ready",
+        cmd="cilium status --wait",
+        resource_deps=["cilium-install", "coredns-install"],
+        labels=["10-checks"],
+    )
+    return ctx
+
+
+def step_network(ctx):
+    ctx = install_coredns(ctx)
+    ctx = install_cilium(ctx)
+    ctx = network_check(ctx)
+    return ctx

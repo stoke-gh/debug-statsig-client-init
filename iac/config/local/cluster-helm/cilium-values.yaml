@@ -1,0 +1,119 @@
+# Cilium configuration for local Kind development
+# Based on production configuration but adapted for Kind
+
+cluster:
+  name: statsig-debug
+  id: 1
+
+# K8s API server configuration
+k8sServiceHost: statsig-debug-control-plane
+k8sServicePort: 6443
+
+# CNI configuration
+cni:
+  exclusive: true
+
+# IP configuration
+ipv4:
+  enabled: true
+ipv6:
+  enabled: false
+
+# IPAM mode - use cluster-pool for Kind (not ENI)
+ipam:
+  mode: cluster-pool
+
+# Use tunnel mode for Kind (not native routing like production)
+routingMode: tunnel
+tunnelProtocol: vxlan
+
+# Cannot use auto direct node routes with tunneling
+autoDirectNodeRoutes: false
+
+# Node initialization
+nodeinit:
+  enabled: true
+
+# Kube-proxy replacement (like production)
+kubeProxyReplacement: true
+kubeProxyReplacementMode: strict
+
+# IPv4 masquerade
+enableIPv4Masquerade: true
+
+# BPF configuration (simplified for Kind)
+bpf:
+  masquerade: true
+  hostLegacyRouting: false
+  # Enable helpful events for debugging
+  events:
+    drop:
+      enabled: true
+    policyVerdict:
+      enabled: true
+    trace:
+      enabled: true
+  # Allow access to ClusterIP services from outside cluster
+  lbExternalClusterIP: true
+
+# Install iptables rules as backup
+installIptablesRules: true
+
+# NodePort configuration
+nodePort:
+  enabled: true
+  autoProtectPortRange: true
+  bindProtection: true
+  enableHealthCheck: true
+
+# HostPort configuration
+hostPort:
+  enabled: true
+
+# Envoy configuration for L7 features
+envoyConfig:
+  enabled: true
+
+# Ingress controller (like production)
+ingressController:
+  enabled: true
+  default: true
+  loadBalancerMode: shared
+  service:
+    type: NodePort
+    # Use NodePort for Kind instead of LoadBalancer
+    # Kind will map these to host ports via kind config
+    externalTrafficPolicy: Cluster
+
+# Load balancer configuration
+loadBalancer:
+  l7:
+    backend: envoy
+
+# Hubble observability (like production)
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    # TODO: mark prod/local differences.
+    # Disable hubble ui to save local resources
+    enabled: false
+    # [hubble.ui.service] -PROD
+    service:
+      type: NodePort
+      nodePort: 32000
+    # [/hubble.ui.service]
+
+# Disable AWS-specific features
+eni:
+  enabled: false
+
+# Features not needed for local development
+hostServices:
+  enabled: false
+externalIPs:
+  enabled: false
+
+# Clean BPF state on restarts (helpful for development)
+cleanBpfState: true

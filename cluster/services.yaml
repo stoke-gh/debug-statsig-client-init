@@ -1,0 +1,68 @@
+# =============================================================================
+#            _____ ______ _______      _______ _____ ______  _____
+#           / ____|  ____|  __ \ \    / /_   _/ ____|  ____|/ ____|
+#          | (___ | |__  | |__) \ \  / /  | || |    | |__  | (___
+#           \___ \|  __| |  _  / \ \/ /   | || |    |  __|  \___ \
+#           ____) | |____| | \ \  \  /   _| || |____| |____ ____) |
+#          |_____/|______|_|  \_\  \/   |_____\_____|______|_____/
+#
+# =============================================================================
+# This file contains the configuration for all services in the cluster. Each top
+# level key is a service name, and the value is a table containing the service
+# configuration options.
+# =============================================================================
+# Common options:
+# - "type":
+#    - The type of service (see below for valid types).
+# - "binary":
+#    - The name of the binary to run for the service.
+# - "port":
+#    - The port to expose for the service.
+# - "live-check":
+#    - Configuration for the live check.
+# - "ready-check":
+#    - Configuration for the ready check.
+# - "local.enabled":
+#    - Whether the service should be enabled when running locally.
+# - "local.forward":
+#    - The port to forward to when running locally.
+# - "local.env":
+#    - Environment variables to load from os.env when running locally.
+# - "local.set-env":
+#    - Environment variables to set to a specific value when running locally.
+# =============================================================================
+# Valid Service Types:
+# - "internal-http":
+#    - Only exposed within the cluster.
+#    - Accepts HTTP traffic.
+# - "internal-grpc":
+#    - Only exposed within the cluster.
+#    - Accepts gRPC traffic.
+# - "external-http":
+#    - Exposed to the internet.
+#    - Accepts HTTP traffic.
+# - "external-grpc":
+#    - Exposed to the internet.
+#    - Accepts gRPC traffic.
+# - "custom":
+#    - Custom service, configured manually.
+# =============================================================================
+
+api-debug:
+  type: "internal-http"
+  binary: "debug"
+  port: 8080
+
+  live-check:
+    path: "/v1/health"
+  ready-check:
+    path: "/v1/health"
+
+  local:
+    enabled: true
+    forward: 8000
+    env:
+      - key: "STATSIG_API_KEY_SECRET"
+    set-env:
+      - key: "WORKERS"
+        value: "16"

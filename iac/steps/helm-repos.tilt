@@ -1,0 +1,25 @@
+
+load("../utils.tilt", "repo_path")
+
+
+def install_helm_repos(ctx):
+    local_resource(
+        "helm-repos",
+        cmd=[
+            "sh", "-c",
+            """
+            # Add cilium helm repo if not already added
+            helm repo list | grep -q cilium || helm repo add cilium https://helm.cilium.io/
+            helm repo update cilium
+            """
+        ],
+        resource_deps=["kubeconfig"],
+        labels=["22-helm"],
+        allow_parallel=True,
+    )
+    return ctx
+
+
+def step_helm_repos(ctx):
+    ctx = install_helm_repos(ctx)
+    return ctx
