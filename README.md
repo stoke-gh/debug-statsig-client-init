@@ -1,5 +1,13 @@
 # debug-statsig-client-init
 
+Issue: Statsig fails to initialize, `client.initialize().wait()` never returns,
+see: `python/packages/repro/repro/router.py`.
+
+Note: Right now this doesn't reproduce the issue. All of the below works. Either
+due to a simplification of our prod environment or different settings in our
+remote cluster vs this local cluster. But this is progressively becoming more
+similar to our production environment where we experienced the issue.
+
 Machine:
 
 - Mac Apple Silicon
@@ -32,3 +40,8 @@ To setup tilt:
     first time. Cancel it after the helm repos are setup and the network is
     "waiting on connection to cluster".
   - Then run `just tilt up` again and things should complete.
+
+To delete the cluster:
+
+- `just tilt down`
+  - (which is just running `ctlptl delete cluster kind-statsig-debug` under the hood)
