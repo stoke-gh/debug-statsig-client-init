@@ -8,10 +8,6 @@ due to a simplification of our prod environment or different settings in our
 remote cluster vs this local cluster. But this is progressively becoming more
 similar to our production environment where we experienced the issue.
 
-Machine:
-
-- Mac Apple Silicon
-
 Install:
 
 - `just`
